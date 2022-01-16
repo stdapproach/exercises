@@ -66,11 +66,7 @@ sumOfSquares x y = x*x + y*y
 -}
 -- DON'T FORGET TO SPECIFY THE TYPE IN HERE
 lastDigit :: Int -> Int
-lastDigit n = mod (myabs n) 10
-  where
-    myabs :: Int -> Int
-    myabs x | x >= 0    = x
-            | otherwise = -x
+lastDigit n = (mod . abs) n 10
 
 {- | Write a function that takes three numbers and returns the
 difference between the biggest number and the smallest one.
@@ -108,7 +104,7 @@ subString :: Int -> Int -> String -> String
 subString start end str
   | end <  0 = ""
   | otherwise = take (end-start2+1) . drop start2 $ str
-    where start2 = if start < 0 then 0 else start
+    where start2 = max 0 start
 
 {- | Write a function that takes a String — space separated numbers,
 and finds a sum of the numbers inside this string.
@@ -147,16 +143,16 @@ lowerAndGreater n list = makeText n numsLessAndMore{-(numLess, numMore)-}
       , "elements and lower than"
       , show c
       , "elements"]
-    numsLessAndMore = count n list
+    numsLessAndMore = count list
       where
-        count :: Int -> [Int] -> (Int, Int)
-        count val = go (0, 0)
+        count :: [Int] -> (Int, Int)
+        count = go (0, 0)
           where
             go :: (Int, Int) -> [Int] -> (Int, Int)
             go (result1, result2) l
               | null l    = (result1, result2) -- if the list is empty, then return our accmulated result
-              | otherwise = if head l < val
+              | otherwise = if head l < n
                             then go (result1 + 1, result2) (tail l)
-                            else if head l > val
+                            else if head l > n
                               then go (result1, result2 + 1) (tail l)
                               else go (result1, result2)     (tail l)
