@@ -41,7 +41,7 @@ module Lecture2
     ) where
 
 -- VVV If you need to import libraries, do it after this line ... VVV
-
+import Data.Maybe
 -- ^^^ and before this line. Otherwise the test suite might fail  ^^^
 
 {- | Implement a function that finds a product of all the numbers in
@@ -52,7 +52,13 @@ zero, you can stop calculating product and return 0 immediately.
 84
 -}
 lazyProduct :: [Int] -> Int
-lazyProduct = error "TODO"
+lazyProduct = go 1
+  where
+    go :: Int -> [Int] -> Int
+    go acc [] = acc
+    go acc (x : xs)
+      | x == 0    = 0
+      | otherwise = x * go acc xs
 
 {- | Implement a function that duplicates every element in the list.
 
@@ -62,7 +68,8 @@ lazyProduct = error "TODO"
 "ccaabb"
 -}
 duplicate :: [a] -> [a]
-duplicate = error "TODO"
+duplicate [] = []
+duplicate (x : xs) = [x, x] ++ duplicate xs
 
 {- | Implement function that takes index and a list and removes the
 element at the given position. Additionally, this function should also
@@ -74,7 +81,11 @@ return the removed element.
 >>> removeAt 10 [1 .. 5]
 (Nothing,[1,2,3,4,5])
 -}
-removeAt = error "TODO"
+removeAt :: Int -> [Int] -> (Maybe Int, [Int])
+removeAt n list
+  | n < 0           = (Nothing, list)
+  | n > length list = (Nothing, list)
+  | otherwise       = ( Just(list !! n), take (n-1) list ++ drop (n+1) list)
 
 {- | Write a function that takes a list of lists and returns only
 lists of even lengths.
@@ -85,7 +96,8 @@ lists of even lengths.
 ♫ NOTE: Use eta-reduction and function composition (the dot (.) operator)
   in this function.
 -}
-evenLists = error "TODO"
+evenLists :: [[a]] -> [[a]]
+evenLists = filter (even . length)
 
 {- | The @dropSpaces@ function takes a string containing a single word
 or number surrounded by spaces and removes all leading and trailing
@@ -101,7 +113,8 @@ spaces.
 
 🕯 HINT: look into Data.Char and Prelude modules for functions you may use.
 -}
-dropSpaces = error "TODO"
+dropSpaces :: String -> String
+dropSpaces = head . words
 
 {- |
 
@@ -157,14 +170,209 @@ You're free to define any helper functions.
        treasure besides gold (if you already haven't done this).
 -}
 
--- some help in the beginning ;)
-data Knight = Knight
-    { knightHealth    :: Int
-    , knightAttack    :: Int
-    , knightEndurance :: Int
+newtype Gold = Gold Int
+newtype XP = XP Int
+newtype Health = Health Int deriving (Eq, Ord)
+newtype Attack = Attack Int deriving (Eq, Ord)
+newtype Endurance = Endurance Int deriving (Eq, Ord)
+
+instance Num Health where
+    (+) (Health a) (Health b) = Health (a + b)
+    (*) (Health a) (Health b) = Health (a * b)
+    abs (Health x) = Health (abs x)
+    signum (Health x) = Health (signum x)
+    (-) (Health a) (Health b) = Health (a - b)
+    fromInteger = Health . fromInteger
+
+instance Num Attack where
+    (+) (Attack a) (Attack b) = Attack (a + b)
+    (*) (Attack a) (Attack b) = Attack (a * b)
+    abs (Attack x) = Attack (abs x)
+    signum (Attack x) = Attack (signum x)
+    (-) (Attack a) (Attack b) = Attack (a - b)
+    fromInteger = Attack . fromInteger
+
+instance Num Endurance where
+    (+) (Endurance a) (Endurance b) = Endurance (a + b)
+    (*) (Endurance a) (Endurance b) = Endurance (a * b)
+    abs (Endurance x) = Endurance (abs x)
+    signum (Endurance x) = Endurance (signum x)
+    (-) (Endurance a) (Endurance b) = Endurance (a - b)
+    fromInteger = Endurance . fromInteger
+
+healthToInt :: Health -> Int
+healthToInt (Health h) = h
+
+attackToInt :: Attack -> Int
+attackToInt (Attack atk) = atk
+
+instance Show Gold where
+    show (Gold g) = "💰 " ++ show g
+
+instance Show XP where
+    show (XP xp) = "✨ " ++ show xp
+
+instance Show Health where
+    show (Health h) = "💖 " ++ show h
+
+instance Show Attack where
+    show (Attack atk) = "🔪 " ++ show atk
+
+instance Show Endurance where
+    show (Endurance e) = "✌ " ++ show e
+
+data Treasure = Treasure
+
+class ChestT a where
+    chestGold :: a -> Gold
+    chestTreasure :: a -> Maybe Treasure
+
+newtype ChestWithTreasureT = ChestWithTreasureT (Gold, Treasure)
+
+instance ChestT ChestWithTreasureT where
+    chestGold (ChestWithTreasureT (g, _)) = g
+    chestTreasure (ChestWithTreasureT (_, t)) = Just t
+
+newtype AcidChestT = AcidChestT Gold
+
+instance ChestT AcidChestT where
+    chestGold (AcidChestT g) = g
+    chestTreasure _ = Nothing
+
+data Chest = ChestWithTreasure ChestWithTreasureT
+           | AcidChest AcidChestT
+
+instance Show Chest where
+    show chest = case chestTreasure chest of
+        Just _ -> "🧰 (" ++ show (chestGold chest) ++ ", with treasure)"
+        Nothing -> "🧰 (" ++ show (chestGold chest) ++ ", no treasure)"
+
+instance ChestT Chest where
+    chestGold (ChestWithTreasure cwt) = chestGold cwt
+    chestGold (AcidChest ac) = chestGold ac
+    chestTreasure (ChestWithTreasure cwt) = chestTreasure cwt
+    chestTreasure (AcidChest ac) = chestTreasure ac
+
+treasureChest :: Gold -> Treasure -> Chest
+treasureChest g t = ChestWithTreasure (ChestWithTreasureT (g, t))
+
+acidChest :: Gold -> Chest
+acidChest g = AcidChest (AcidChestT g)
+
+class DragonT a where
+    dragonExperience :: a -> XP
+    dragonFirePower :: a -> Attack
+    dragonHealth :: a -> Health
+    dragonSlayCounter :: a -> Int
+    dragonChest :: a -> Chest
+
+data RedDragonT = RedDragonT
+    { redDragonHealth :: Health
+    , redDragonFirePower :: Attack
+    , redDragonSlayCounter :: Int
+    , redDragonGold :: Gold
+    , redDragonTreasure :: Treasure
     }
 
-dragonFight = error "TODO"
+data BlackDragonT = BlackDragonT
+    { blackDragonHealth :: Health
+    , blackDragonFirePower :: Attack
+    , blackDragonSlayCounter :: Int
+    , blackDragonGold :: Gold
+    , blackDragonTreasure :: Treasure
+    }
+
+data GreenDragonT = GreenDragonT
+    { greenDragonHealth :: Health
+    , greenDragonFirePower :: Attack
+    , greenDragonSlayCounter :: Int
+    , greenDragonGold :: Gold
+    }
+
+instance DragonT RedDragonT where
+    dragonExperience _ = XP 100
+    dragonFirePower = redDragonFirePower
+    dragonHealth = redDragonHealth
+    dragonSlayCounter = redDragonSlayCounter
+    dragonChest d = treasureChest (redDragonGold d) (redDragonTreasure d)
+
+instance DragonT BlackDragonT where
+    dragonExperience _ = XP 150
+    dragonFirePower = blackDragonFirePower
+    dragonHealth = blackDragonHealth
+    dragonSlayCounter = blackDragonSlayCounter
+    dragonChest d = treasureChest (blackDragonGold d) (blackDragonTreasure d)
+
+instance DragonT GreenDragonT where
+    dragonExperience _ = XP 250
+    dragonFirePower = greenDragonFirePower
+    dragonHealth = greenDragonHealth
+    dragonSlayCounter = greenDragonSlayCounter
+    dragonChest = acidChest . greenDragonGold
+
+data Dragon = RedDragon RedDragonT
+            | BlackDragon BlackDragonT
+            | GreenDragon GreenDragonT
+
+instance DragonT Dragon where
+    dragonExperience (RedDragon r) = dragonExperience r
+    dragonExperience (BlackDragon b) = dragonExperience b
+    dragonExperience (GreenDragon g) = dragonExperience g
+    dragonFirePower (RedDragon r) = dragonFirePower r
+    dragonFirePower (BlackDragon b) = dragonFirePower b
+    dragonFirePower (GreenDragon g) = dragonFirePower g
+    dragonHealth (RedDragon r) = dragonHealth r
+    dragonHealth (BlackDragon b) = dragonHealth b
+    dragonHealth (GreenDragon g) = dragonHealth g
+    dragonSlayCounter (RedDragon r) = dragonSlayCounter r
+    dragonSlayCounter (BlackDragon b) = dragonSlayCounter b
+    dragonSlayCounter (GreenDragon g) = dragonSlayCounter g
+    dragonChest (RedDragon r) = dragonChest r
+    dragonChest (BlackDragon b) = dragonChest b
+    dragonChest (GreenDragon g) = dragonChest g
+
+withSlay :: Int -> Dragon -> Dragon
+withSlay n (RedDragon r) = RedDragon (r { redDragonSlayCounter = n })
+withSlay n (BlackDragon b) = BlackDragon (b { blackDragonSlayCounter = n })
+withSlay n (GreenDragon g) = GreenDragon (g { greenDragonSlayCounter = n })
+
+withHealth :: Health -> Dragon -> Dragon
+withHealth h (RedDragon r) = RedDragon (r { redDragonHealth = h })
+withHealth h (BlackDragon b) = BlackDragon (b { blackDragonHealth = h })
+withHealth h (GreenDragon g) = GreenDragon (g { greenDragonHealth = h })
+
+class Attackable a where
+    health :: a -> Health
+    dead :: a -> Bool
+    withAttack :: a -> Attack -> a
+
+instance Attackable Dragon where
+    health = dragonHealth
+    dead = (< 0) . health
+    withAttack d atk = withSlay (dragonSlayCounter d + 1) (withHealth (Health (healthToInt (dragonHealth d) - attackToInt atk)) d)
+
+data Knight = Knight
+    { knightHealth    :: Health
+    , knightAttack    :: Attack
+    , knightEndurance :: Endurance
+    }
+
+instance Attackable Knight where
+    health = knightHealth
+    dead = (< 0) . health
+    withAttack k atk = k { knightHealth = Health (healthToInt (knightHealth k) - attackToInt atk) }
+
+data BattleOutcome = Win Chest XP
+                   | Loss
+                   | Fled
+                   deriving (Show)
+
+dragonFight :: Knight -> Dragon -> BattleOutcome
+dragonFight k _ | dead k = Loss
+dragonFight _ d | dead d = Win (dragonChest d) (dragonExperience d)
+dragonFight k _ | knightEndurance k <= 0 = Fled
+dragonFight k d | dragonSlayCounter d == 10 = dragonFight (withAttack k $ dragonFirePower d) (withSlay 0 d)
+dragonFight k d = dragonFight (k { knightEndurance = knightEndurance k - 1 }) (withAttack (withSlay (dragonSlayCounter d + 1) d) (knightAttack k))
 
 ----------------------------------------------------------------------------
 -- Extra Challenges
@@ -185,7 +393,11 @@ False
 True
 -}
 isIncreasing :: [Int] -> Bool
-isIncreasing = error "TODO"
+isIncreasing []  = True
+isIncreasing [_] = True
+isIncreasing (x:y:xs)
+  | x > y     = False
+  | otherwise = isIncreasing (y:xs)
 
 {- | Implement a function that takes two lists, sorted in the
 increasing order, and merges them into new list, also sorted in the
@@ -198,7 +410,11 @@ verify that.
 [1,2,3,4,7]
 -}
 merge :: [Int] -> [Int] -> [Int]
-merge = error "TODO"
+merge [] x = x
+merge x [] = x
+merge (x:xs) (y:ys)
+  | y < x     = y : merge (x:xs) ys
+  | otherwise = x : merge xs (y:ys)
 
 {- | Implement the "Merge Sort" algorithm in Haskell. The @mergeSort@
 function takes a list of numbers and returns a new list containing the
@@ -215,7 +431,13 @@ The algorithm of merge sort is the following:
 [1,2,3]
 -}
 mergeSort :: [Int] -> [Int]
-mergeSort = error "TODO"
+mergeSort []  = []
+mergeSort [x] = [x]
+mergeSort xs  = merge firstHalfSorted secondHalfSorted
+     where firstHalfSorted  = mergeSort . fst $ halves
+           secondHalfSorted = mergeSort . snd $ halves
+           halves           = splitAt halfPoint xs
+           halfPoint        = length xs `div` 2
 
 
 {- | Haskell is famous for being a superb language for implementing
@@ -268,7 +490,18 @@ data EvalError
 It returns either a successful evaluation result or an error.
 -}
 eval :: Variables -> Expr -> Either EvalError Int
-eval = error "TODO"
+eval _ (Lit x) = Right x
+eval vars (Var v)
+  | isJust it = Right (fromJust it)
+  | otherwise = Left (VariableNotFound ("Error: no substution for " ++ show v))
+  where it = lookup v vars
+eval vars (Add exp1 exp2) = case (v1, v2) of
+  (Left a, _)        -> Left (VariableNotFound ("Error: Left operand isn't a Lit," ++ show a))
+  (_ , Left b)       -> Left (VariableNotFound ("Error: Right operand isn't a Lit," ++ show b))
+  (Right a, Right b) -> Right (a + b)
+  where
+    v1 = eval vars exp1
+    v2 = eval vars exp2
 
 {- | Compilers also perform optimizations! One of the most common
 optimizations is "Constant Folding". It performs arithmetic operations
@@ -291,5 +524,29 @@ x + 45 + y
 Write a function that takes and expression and performs "Constant
 Folding" optimization on the given expression.
 -}
+expandVars :: [String] -> Expr
+expandVars [] = Lit 0
+expandVars [a] = Var a
+expandVars (x:xs) = Add (Var x) (expandVars xs)
+
+expandIntsVars :: ([Int], [String]) -> Expr
+expandIntsVars ([], b) = expandVars b
+expandIntsVars ([a], b) = Add (Lit a) (expandVars b)
+expandIntsVars (a, b) = Add (Lit (sum a)) (expandVars b)
+
+flattenExpr :: Expr -> [Expr]
+flattenExpr (Lit x) = [Lit x]
+flattenExpr (Var x) = [Var x]
+flattenExpr (Add ex1 ex2) = flattenExpr ex1 ++ flattenExpr ex2
+
+separateFlatten :: [Expr] -> ([Int], [String])
+separateFlatten l = go ([],[]) l
+  where
+    go :: ([Int], [String]) -> [Expr] -> ([Int], [String])
+    go acc [] = acc
+    go acc ((Lit a):xs) = go ([a] ++ (fst acc), snd acc) xs
+    go acc ((Var a):xs) = go (fst acc, [a] ++ (snd acc)) xs
+    go acc ((Add _ _):xs)  = go acc xs
+
 constantFolding :: Expr -> Expr
-constantFolding = error "TODO"
+constantFolding expr = expandIntsVars (separateFlatten (flattenExpr expr))
