@@ -56,9 +56,8 @@ lazyProduct = go 1
   where
     go :: Int -> [Int] -> Int
     go acc [] = acc
-    go acc (x : xs)
-      | x == 0    = 0
-      | otherwise = x * go acc xs
+    go acc (0 : _) = 0
+    go acc (x : xs) = x * go acc xs
 
 {- | Implement a function that duplicates every element in the list.
 
@@ -68,8 +67,7 @@ lazyProduct = go 1
 "ccaabb"
 -}
 duplicate :: [a] -> [a]
-duplicate [] = []
-duplicate (x : xs) = [x, x] ++ duplicate xs
+duplicate = concatMap (replicate 2)
 
 {- | Implement function that takes index and a list and removes the
 element at the given position. Additionally, this function should also
@@ -81,11 +79,23 @@ return the removed element.
 >>> removeAt 10 [1 .. 5]
 (Nothing,[1,2,3,4,5])
 -}
-removeAt :: Int -> [Int] -> (Maybe Int, [Int])
-removeAt n list
-  | n < 0           = (Nothing, list)
-  | n > length list = (Nothing, list)
-  | otherwise       = ( Just(list !! n), take (n-1) list ++ drop (n+1) list)
+removeAt :: Int -> [a] -> (Maybe a, [a])
+removeAt n list = (a, b ++ c)
+  where
+    (b, a, c) = decompose n list
+      where
+        decompose :: Int -> [a] -> ([a], Maybe a, [a])
+        decompose _ [] = ([], Nothing, [])
+        decompose ind [x]
+          | ind == 0  = ([], Just x, [])
+          | otherwise = ([x], Nothing, [])
+        decompose ind list = go (0,[]) ind list
+          where
+            go :: (Int, [a]) -> Int -> [a] -> ([a], Maybe a, [a])
+            go (_, ll) _ [] = (ll, Nothing, [])
+            go (currInd, ll) i (x:xs)
+              | currInd == i = (ll, Just x, xs)
+              | otherwise    = go (currInd+1, ll ++ [x]) ind xs
 
 {- | Write a function that takes a list of lists and returns only
 lists of even lengths.
@@ -395,9 +405,7 @@ True
 isIncreasing :: [Int] -> Bool
 isIncreasing []  = True
 isIncreasing [_] = True
-isIncreasing (x:y:xs)
-  | x > y     = False
-  | otherwise = isIncreasing (y:xs)
+isIncreasing (x : y : ys) = x < y && isIncreasing (y : ys)
 
 {- | Implement a function that takes two lists, sorted in the
 increasing order, and merges them into new list, also sorted in the
@@ -409,10 +417,11 @@ verify that.
 >>> merge [1, 2, 4] [3, 7]
 [1,2,3,4,7]
 -}
-merge :: [Int] -> [Int] -> [Int]
+merge :: Ord a => [a] -> [a] -> [a]
 merge [] x = x
 merge x [] = x
 merge (x:xs) (y:ys)
+  | y == x    = y : x: merge xs ys
   | y < x     = y : merge (x:xs) ys
   | otherwise = x : merge xs (y:ys)
 
@@ -430,14 +439,15 @@ The algorithm of merge sort is the following:
 >>> mergeSort [3, 1, 2]
 [1,2,3]
 -}
-mergeSort :: [Int] -> [Int]
+mergeSort :: Ord a => [a] -> [a]
 mergeSort []  = []
 mergeSort [x] = [x]
-mergeSort xs  = merge firstHalfSorted secondHalfSorted
-     where firstHalfSorted  = mergeSort . fst $ halves
-           secondHalfSorted = mergeSort . snd $ halves
-           halves           = splitAt halfPoint xs
-           halfPoint        = length xs `div` 2
+mergeSort xs  = merge (mergeSort ys) (mergeSort zs)
+  where
+  (ys,zs)     = splitHalf xs
+    where
+      splitHalf :: [a] -> ([a], [a])
+      splitHalf l = splitAt ((length l + 1) `div` 2) l
 
 
 {- | Haskell is famous for being a superb language for implementing
