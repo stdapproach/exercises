@@ -35,7 +35,7 @@ module Lecture3
     ) where
 
 -- VVV If you need to import libraries, do it after this line ... VVV
-
+import Data.List
 -- ^^^ and before this line. Otherwise the test suite might fail  ^^^
 
 -- $setup
@@ -52,7 +52,7 @@ data Weekday
     | Friday
     | Saturday
     | Sunday
-    deriving (Show, Eq)
+    deriving (Show, Eq, Bounded, Enum)
 
 {- | Write a function that will display only the first three letters
 of a weekday.
@@ -60,7 +60,8 @@ of a weekday.
 >>> toShortString Monday
 "Mon"
 -}
-toShortString = error "TODO"
+toShortString :: Weekday -> String
+toShortString v = take 3 $ show v
 
 {- | Write a function that returns next day of the week, following the
 given day.
@@ -82,7 +83,25 @@ Tuesday
   would work for **any** enumeration type in Haskell (e.g. 'Bool',
   'Ordering') and not just 'Weekday'?
 -}
-next = error "TODO"
+getTypeValues :: [Weekday]
+getTypeValues = [minBound :: Weekday .. maxBound :: Weekday]
+
+getIndexWithinType :: Weekday -> Maybe Int
+getIndexWithinType v = elemIndex v getTypeValues
+
+correctIndexByMod :: Int -> Int
+correctIndexByMod ind = mod ind typeSize
+  where
+    typeSize = length getTypeValues
+
+next :: Weekday -> Weekday
+next v = go ind
+  where
+    list = getTypeValues
+    ind = getIndexWithinType v
+    go :: Maybe Int -> Weekday
+    go Nothing  = head list -- trap for corner-case
+    go (Just i) = list !! correctIndexByMod (i+1)
 
 {- | Implement a function that calculates number of days from the first
 weekday to the second.
@@ -92,7 +111,16 @@ weekday to the second.
 >>> daysTo Friday Wednesday
 5
 -}
-daysTo = error "TODO"
+daysTo :: Weekday -> Weekday -> Int
+daysTo a b = go a' b'
+  where
+    a' = getIndexWithinType a
+    b' = getIndexWithinType b
+    go :: Maybe Int -> Maybe Int -> Int
+    go Nothing Nothing       = 0
+    go Nothing _             = 0
+    go _ Nothing             = 0
+    go (Just a'') (Just b'') = correctIndexByMod (b'' - a'')
 
 {-
 
@@ -108,9 +136,10 @@ newtype Gold = Gold
 
 -- | Addition of gold coins.
 instance Semigroup Gold where
-
+  (Gold a) <> (Gold b) = Gold (a+b)
 
 instance Monoid Gold where
+  mempty = Gold 0
 
 
 {- | A reward for completing a difficult quest says how much gold
@@ -125,9 +154,12 @@ data Reward = Reward
     } deriving (Show, Eq)
 
 instance Semigroup Reward where
-
+  (Reward ag as) <> (Reward bg bs)
+    | as || bs = Reward (ag <> bg) True
+    | otherwise = mempty
 
 instance Monoid Reward where
+  mempty = Reward mempty False
 
 
 {- | 'List1' is a list that contains at least one element.
@@ -137,6 +169,7 @@ data List1 a = List1 a [a]
 
 -- | This should be list append.
 instance Semigroup (List1 a) where
+  (List1 a la) <> (List1 b lb) = List1 a ([b] ++ la ++ lb)
 
 
 {- | Does 'List1' have the 'Monoid' instance? If no then why?
@@ -159,10 +192,14 @@ monsters, you should get a combined treasure and not just the first
 🕯 HINT: You may need to add additional constraints to this instance
   declaration.
 -}
-instance Semigroup (Treasure a) where
+instance Semigroup a => Semigroup (Treasure a) where
+  NoTreasure <> b  = b
+  a <> NoTreasure  = a
+  SomeTreasure a <> SomeTreasure b  = SomeTreasure $ a <> b
 
 
-instance Monoid (Treasure a) where
+instance Semigroup a => Monoid (Treasure a) where
+  mempty = NoTreasure
 
 
 {- | Abstractions are less helpful if we can't write functions that
@@ -181,8 +218,8 @@ together only different elements.
 Product {getProduct = 6}
 
 -}
-appendDiff3 = error "TODO"
-
+appendDiff3 :: (Monoid a, Eq a) => a -> a -> a -> a
+appendDiff3 l1 l2 l3 = mconcat $ nub [l1, l2, l3]
 {-
 
 In the next block of tasks, implement 'Foldable' instances for all
@@ -213,9 +250,26 @@ types that can have such an instance.
 -- instance Foldable Weekday where
 -- instance Foldable Gold where
 -- instance Foldable Reward where
--- instance Foldable List1 where
--- instance Foldable Treasure where
+-- can't a non-polymorphic type implement Foldable in Haskell
+instance Foldable List1 where
+  foldr :: (a -> b -> b) -> b -> List1 a -> b
+  foldr func acc (List1 h []) = func h acc
+  foldr func acc (List1 h [t]) = func h (foldr func acc (List1 t []))
+  foldr func acc (List1 h (x : xs)) = foldr func (func x acc) (List1 h xs)
 
+  foldMap :: (Monoid m) => (a -> m) -> List1 a -> m
+  foldMap func (List1 h []) = func h
+  foldMap func (List1 h [t]) = func h <> func t
+  foldMap func (List1 h (x : xs)) = func h <> foldMap func (List1 x xs)
+
+instance Foldable Treasure where
+  foldr :: (a -> b -> b) -> b -> Treasure a -> b
+  foldr _ acc NoTreasure = acc
+  foldr func acc (SomeTreasure val) = func val acc
+
+  foldMap :: (Monoid m) => (a -> m) -> Treasure a -> m
+  foldMap _ NoTreasure = mempty
+  foldMap func (SomeTreasure val) = func val
 {-
 
 In the next block of tasks, implement 'Functor' instances for all
@@ -229,8 +283,14 @@ types that can have such an instance.
 -- instance Functor Weekday where
 -- instance Functor Gold where
 -- instance Functor Reward where
--- instance Functor List1 where
--- instance Functor Treasure where
+instance Functor List1 where
+  fmap :: (a -> b) -> List1 a -> List1 b
+  fmap func (List1 h t) = List1 (func h) (fmap func t)
+
+instance Functor Treasure where
+  fmap :: (a -> b) -> Treasure a -> Treasure b
+  fmap _ NoTreasure = NoTreasure
+  fmap func (SomeTreasure val) = SomeTreasure (func val)
 
 {- | Functions are first-class values in Haskell. This means that they
 can be even stored inside other data types as well!
@@ -249,4 +309,5 @@ Just [8,9,10]
 [8,20,3]
 
 -}
-apply = error "TODO"
+apply :: Applicative f => a -> f (a -> b) -> f b
+apply arg f = f <*> pure arg
