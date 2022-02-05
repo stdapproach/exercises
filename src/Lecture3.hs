@@ -61,7 +61,7 @@ of a weekday.
 "Mon"
 -}
 toShortString :: Weekday -> String
-toShortString v = take 3 $ show v
+toShortString = take 3 . show
 
 {- | Write a function that returns next day of the week, following the
 given day.
@@ -83,25 +83,11 @@ Tuesday
   would work for **any** enumeration type in Haskell (e.g. 'Bool',
   'Ordering') and not just 'Weekday'?
 -}
-getTypeValues :: [Weekday]
-getTypeValues = [minBound :: Weekday .. maxBound :: Weekday]
 
-getIndexWithinType :: Weekday -> Maybe Int
-getIndexWithinType v = elemIndex v getTypeValues
-
-correctIndexByMod :: Int -> Int
-correctIndexByMod ind = mod ind typeSize
-  where
-    typeSize = length getTypeValues
-
-next :: Weekday -> Weekday
-next v = go ind
-  where
-    list = getTypeValues
-    ind = getIndexWithinType v
-    go :: Maybe Int -> Weekday
-    go Nothing  = head list -- trap for corner-case
-    go (Just i) = list !! correctIndexByMod (i+1)
+next :: (Eq a, Bounded a, Enum a) => a -> a
+next val
+  | val == maxBound = minBound
+  | otherwise       = succ val
 
 {- | Implement a function that calculates number of days from the first
 weekday to the second.
@@ -111,16 +97,13 @@ weekday to the second.
 >>> daysTo Friday Wednesday
 5
 -}
-daysTo :: Weekday -> Weekday -> Int
-daysTo a b = go a' b'
+daysTo:: Weekday -> Weekday -> Int
+daysTo = go 0
   where
-    a' = getIndexWithinType a
-    b' = getIndexWithinType b
-    go :: Maybe Int -> Maybe Int -> Int
-    go Nothing Nothing       = 0
-    go Nothing _             = 0
-    go _ Nothing             = 0
-    go (Just a'') (Just b'') = correctIndexByMod (b'' - a'')
+    go :: Int -> Weekday -> Weekday -> Int
+    go acc it1 it2
+      | it1 == it2 = acc
+      | otherwise  = 1 + daysTo (next it1) it2
 
 {-
 
@@ -169,7 +152,7 @@ data List1 a = List1 a [a]
 
 -- | This should be list append.
 instance Semigroup (List1 a) where
-  (List1 a la) <> (List1 b lb) = List1 a ([b] ++ la ++ lb)
+  (List1 a as) <> (List1 b bs) = List1 a (as ++ [b] ++ bs)
 
 
 {- | Does 'List1' have the 'Monoid' instance? If no then why?
@@ -218,8 +201,8 @@ together only different elements.
 Product {getProduct = 6}
 
 -}
-appendDiff3 :: (Monoid a, Eq a) => a -> a -> a -> a
-appendDiff3 l1 l2 l3 = mconcat $ nub [l1, l2, l3]
+appendDiff3 :: (Semigroup a, Eq a) => a -> a -> a -> a
+appendDiff3 l1 l2 l3 = foldr1 (<>) $ nub [l1, l2, l3]
 {-
 
 In the next block of tasks, implement 'Foldable' instances for all
@@ -253,14 +236,10 @@ types that can have such an instance.
 -- can't a non-polymorphic type implement Foldable in Haskell
 instance Foldable List1 where
   foldr :: (a -> b -> b) -> b -> List1 a -> b
-  foldr func acc (List1 h []) = func h acc
-  foldr func acc (List1 h [t]) = func h (foldr func acc (List1 t []))
-  foldr func acc (List1 h (x : xs)) = foldr func (func x acc) (List1 h xs)
+  foldr func acc (List1 h t) = func h (foldr func acc t)
 
   foldMap :: (Monoid m) => (a -> m) -> List1 a -> m
-  foldMap func (List1 h []) = func h
-  foldMap func (List1 h [t]) = func h <> func t
-  foldMap func (List1 h (x : xs)) = func h <> foldMap func (List1 x xs)
+  foldMap func (List1 h t) = func h <> foldMap func t
 
 instance Foldable Treasure where
   foldr :: (a -> b -> b) -> b -> Treasure a -> b
@@ -310,4 +289,4 @@ Just [8,9,10]
 
 -}
 apply :: Applicative f => a -> f (a -> b) -> f b
-apply arg f = f <*> pure arg
+apply arg = fmap (\f -> f arg)
