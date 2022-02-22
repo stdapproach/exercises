@@ -102,7 +102,7 @@ module Lecture4
     , printProductStats
     ) where
 
-import Data.List.NonEmpty (NonEmpty (..), fromList)
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Semigroup (Max (..), Min (..), Semigroup (..), Sum (..))
 import Text.Read (readMaybe)
 import Data.Maybe (maybe, mapMaybe)
@@ -152,9 +152,7 @@ readProduct "" = Nothing
 readProduct p = Just p
 
 readTrade :: String -> Maybe TradeType
-readTrade "Buy"  = Just Buy
-readTrade "Sell" = Just Sell
-readTrade _      = Nothing
+readTrade = readMaybe
 
 readCost :: String -> Maybe Int
 readCost = readMaybe
@@ -291,7 +289,7 @@ implement the next task.
 combineRows :: NonEmpty Row -> Stats
 combineRows rows = concat1 $ fmap rowToStats rows
   where
-    concat1:: (Semigroup a) => NonEmpty a -> a
+    concat1 :: (Semigroup a) => NonEmpty a -> a
     concat1 = foldr1 (\x !acc -> x <> acc)
 
 {-
@@ -335,7 +333,7 @@ the file doesn't have any products.
 
 calculateStats :: String -> String
 calculateStats input = case rows of [] -> "the file doesn't have any products"
-                                    _  -> displayStats . combineRows . fromList $ rows
+                                    x : xs  -> displayStats $ combineRows $ x :| xs
   where
     rows = Data.Maybe.mapMaybe parseRow $ lines input
 
